@@ -17,4 +17,4 @@ PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID", "YOUR_PHONE_NUMBER_ID_HERE")
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "1234")
 
 # Sarvam AI
-SARV_API = os.getenv("sarv_api")
+SARV_API = os.getenv("SARV_API")
