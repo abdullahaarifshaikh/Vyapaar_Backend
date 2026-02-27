@@ -8,3 +8,4 @@ langgraph-prebuilt
 python-dotenv
 requests
 pydantic
+sarvamai

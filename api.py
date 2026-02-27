@@ -1,10 +1,13 @@
-﻿import requests
+﻿import os
+import tempfile
+import requests
 from fastapi import FastAPI, Request, Query
 from fastapi.responses import PlainTextResponse
 from langchain_core.messages import HumanMessage, SystemMessage
 from config.settings import VERIFY_TOKEN, WHATSAPP_TOKEN, PHONE_NUMBER_ID
 from core.workflow import build_workflow
 from main import SYSTEM_PROMPT
+from tools.audio_tools import process_audio_file
 
 app = FastAPI()
 agent_app = build_workflow()
@@ -43,6 +46,29 @@ async def receive_message(request: Request):
                 response = process_with_ai(sender_id, user_text)
                 send_whatsapp_message(sender_id, response)
 
+            elif message_data["type"] == "audio":
+                audio_id = message_data["audio"]["id"]
+                audio_path = download_whatsapp_media(audio_id)
+                
+                if audio_path:
+                    # Use the tool to transcribe and translate
+                    result = process_audio_file.invoke({"audio_file_path": audio_path})
+                    
+                    if result.get("status") == "success":
+                        user_text = result.get("translated_text", "")
+                        
+                        if user_text:
+                            # Setup session history per user
+                            if sender_id not in messages_store:
+                                messages_store[sender_id] = [SystemMessage(content=SYSTEM_PROMPT)]
+
+                            response = process_with_ai(sender_id, user_text)
+                            send_whatsapp_message(sender_id, response)
+                    
+                    # Cleanup temp file
+                    if os.path.exists(audio_path):
+                        os.remove(audio_path)
+
     except Exception as e:
         print(f"Error processing message: {e}")
         return {"status": "error", "error": str(e)}
@@ -72,3 +98,30 @@ def send_whatsapp_message(to_number: str, message_text: str):
         "text": {"body": message_text}
     }
     requests.post(url, json=payload, headers=headers)
+
+def download_whatsapp_media(media_id: str) -> str:
+    """Downloads media from WhatsApp and returns the local file path."""
+    try:
+        # Step 1: Get media URL
+        url = f"https://graph.facebook.com/v17.0/{media_id}"
+        headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}"}
+        response = requests.get(url, headers=headers)
+        media_url = response.json().get("url")
+        
+        if not media_url:
+            print(f"Could not get URL for media {media_id}")
+            return None
+            
+        # Step 2: Download the file
+        media_response = requests.get(media_url, headers=headers)
+        
+        # Create a temp file
+        # Most WhatsApp audio messages are .ogg or .m4a
+        processed_file = tempfile.NamedTemporaryFile(delete=False, suffix=".ogg")
+        processed_file.write(media_response.content)
+        processed_file.close()
+        
+        return processed_file.name
+    except Exception as e:
+        print(f"Error downloading WhatsApp media: {e}")
+        return None

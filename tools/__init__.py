@@ -4,6 +4,7 @@ from .sales_tools import (
     get_sales_summary,
     get_top_products
 )
+from .audio_tools import process_audio_file
 
 # Added the reporting tools to the list
 tools = [
@@ -12,5 +13,6 @@ tools = [
     update_stock,
     create_sales_order,
     get_sales_summary,
-    get_top_products
+    get_top_products,
+    process_audio_file
 ]
