@@ -20,16 +20,29 @@ def create_sales_order(customer_id: str, items: List[OrderLine]):
 
     try:
         for item in items:
-            product = products_collection.find_one({"_id": ObjectId(item["product_id"])})
+            pid = item.get("product_id")
+            
+            # Try finding by ID first if it looks like an ObjectId
+            product = None
+            if len(str(pid)) == 24:
+                try:
+                    product = products_collection.find_one({"_id": ObjectId(pid)})
+                except:
+                    pass
+            
+            # If not found by ID (or not an ID), search by name
             if not product:
-                return {"status": "error", "message": f"Product ID {item['product_id']} not found."}
+                product = products_collection.find_one({"name": {"$regex": f"^{pid}$", "$options": "i"}})
+            
+            if not product:
+                return {"status": "error", "message": f"Product '{pid}' not found."}
 
             if product["quantity"] < item["quantity"]:
-                return {"status": "error", "message": f"Insufficient stock for {product['name']}."}
+                return {"status": "error", "message": f"Insufficient stock for {product['name']}. Current: {product['quantity']}"}
 
             # Deduct stock
             products_collection.update_one(
-                {"_id": ObjectId(item["product_id"])},
+                {"_id": product["_id"]},
                 {"$inc": {"quantity": -item["quantity"]}}
             )
 

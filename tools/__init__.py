@@ -6,6 +6,7 @@ from .sales_tools import (
 )
 from .audio_tools import process_audio_file
 from .reporting_tools import generate_sales_dashboard_pdf
+from .import_tools import import_inventory_from_excel
 
 # Added the reporting tools to the list
 tools = [
@@ -17,5 +18,6 @@ tools = [
     get_sales_summary,
     get_top_products,
     process_audio_file,
-    generate_sales_dashboard_pdf
+    generate_sales_dashboard_pdf,
+    import_inventory_from_excel
 ]

@@ -92,6 +92,31 @@ async def receive_message(request: Request):
                     if os.path.exists(audio_path):
                         os.remove(audio_path)
 
+            elif message_data["type"] == "document":
+                doc_id = message_data["document"]["id"]
+                file_name = message_data["document"].get("filename", "inventory.xlsx")
+                suffix = os.path.splitext(file_name)[1]
+                
+                print(f"Received document: {file_name}")
+                file_path = download_whatsapp_media(doc_id, suffix=suffix)
+                
+                if file_path:
+                    # Setup session history per user
+                    if sender_id not in messages_store:
+                        messages_store[sender_id] = [SystemMessage(content=SYSTEM_PROMPT)]
+
+                    # Send the path to AI so it can trigger the import tool
+                    user_input = f"I have uploaded an Excel file at {file_path}. Please import the inventory from it."
+                    response = process_with_ai(sender_id, user_input)
+                    send_whatsapp_message(sender_id, response)
+                    
+                    # Cleanup after processing (AI should have called the tool)
+                    # Note: In a more complex flow, cleanup might happen after the tool call returns
+                    # but for simplicity we cleanup here or let the tool handle it.
+                    # Since the tool reads it, we should probably keep it until the AI finishes.
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+
     except Exception as e:
         print(f"Error processing message: {e}")
         return {"status": "error", "error": str(e)}
@@ -116,6 +141,9 @@ def process_with_ai(sender_id: str, user_input: str) -> str:
                 text_response += block
     else:
         text_response = str(content)
+    
+    # Remove the tool_call block from the message sent to the user
+    text_response = text_response.split("```tool_call")[0].strip()
     
     user_history.append(last_message)
     return text_response
@@ -173,7 +201,7 @@ def send_whatsapp_document(to_number: str, file_path: str, caption: str = ""):
     except Exception as e:
         print(f"Error sending WhatsApp document: {e}")
 
-def download_whatsapp_media(media_id: str) -> str:
+def download_whatsapp_media(media_id: str, suffix: str = ".ogg") -> str:
     """Downloads media from WhatsApp and returns the local file path."""
     try:
         # Step 1: Get media URL
@@ -190,8 +218,7 @@ def download_whatsapp_media(media_id: str) -> str:
         media_response = requests.get(media_url, headers=headers)
         
         # Create a temp file
-        # Most WhatsApp audio messages are .ogg or .m4a
-        processed_file = tempfile.NamedTemporaryFile(delete=False, suffix=".ogg")
+        processed_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
         processed_file.write(media_response.content)
         processed_file.close()
         

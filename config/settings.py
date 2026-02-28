@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Google API Key
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
+#GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+#os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
 
 # MongoDB
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")

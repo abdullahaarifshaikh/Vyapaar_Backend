@@ -2,7 +2,7 @@
 uvicorn
 pymongo
 langchain-core
-langchain-google-genai
+langchain-openai
 langgraph
 langgraph-prebuilt
 python-dotenv
@@ -12,3 +12,4 @@ sarvamai
 reportlab
 matplotlib
 pandas
+openpyxl
