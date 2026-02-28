@@ -45,6 +45,18 @@ async def receive_message(request: Request):
 
                 response = process_with_ai(sender_id, user_text)
                 send_whatsapp_message(sender_id, response)
+                
+                # Check for PDF path in the response
+                if ".pdf" in response:
+                    import re
+                    # Look for absolute path pattern
+                    match = re.search(r'(/[^\s\'"]+\.pdf)', response)
+                    if match:
+                        pdf_path = match.group(0).strip()
+                        if os.path.exists(pdf_path):
+                            send_whatsapp_document(sender_id, pdf_path, "Your Sales Dashboard")
+                        else:
+                            print(f"Detected PDF path does not exist: {pdf_path}")
 
             elif message_data["type"] == "audio":
                 audio_id = message_data["audio"]["id"]
@@ -64,6 +76,17 @@ async def receive_message(request: Request):
 
                             response = process_with_ai(sender_id, user_text)
                             send_whatsapp_message(sender_id, response)
+                            
+                            # Check for PDF path in the response
+                            if ".pdf" in response:
+                                import re
+                                match = re.search(r'(/[^\s\'"]+\.pdf)', response)
+                                if match:
+                                    pdf_path = match.group(0).strip()
+                                    if os.path.exists(pdf_path):
+                                        send_whatsapp_document(sender_id, pdf_path, "Your Sales Dashboard")
+                                    else:
+                                        print(f"Detected PDF path does not exist: {pdf_path}")
                     
                     # Cleanup temp file
                     if os.path.exists(audio_path):
@@ -82,8 +105,20 @@ def process_with_ai(sender_id: str, user_input: str) -> str:
     result = agent_app.invoke({"messages": user_history})
     last_message = result["messages"][-1]
     
+    # Extract clean text from AI response
+    content = last_message.content
+    if isinstance(content, list):
+        text_response = ""
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text_response += block.get("text", "")
+            elif isinstance(block, str):
+                text_response += block
+    else:
+        text_response = str(content)
+    
     user_history.append(last_message)
-    return last_message.content
+    return text_response
 
 def send_whatsapp_message(to_number: str, message_text: str):
     url = f"https://graph.facebook.com/v17.0/{PHONE_NUMBER_ID}/messages"
@@ -98,6 +133,45 @@ def send_whatsapp_message(to_number: str, message_text: str):
         "text": {"body": message_text}
     }
     requests.post(url, json=payload, headers=headers)
+
+def send_whatsapp_document(to_number: str, file_path: str, caption: str = ""):
+    """Uploads and sends a document to WhatsApp."""
+    try:
+        # 1. Upload to WhatsApp
+        upload_url = f"https://graph.facebook.com/v17.0/{PHONE_NUMBER_ID}/media"
+        headers = {
+            "Authorization": f"Bearer {WHATSAPP_TOKEN}"
+        }
+        with open(file_path, "rb") as f:
+            files = {
+                "file": (os.path.basename(file_path), f, "application/pdf"),
+                "type": (None, "application/pdf"),
+                "messaging_product": (None, "whatsapp")
+            }
+            upload_response = requests.post(upload_url, headers=headers, files=files)
+            
+        media_id = upload_response.json().get("id")
+        
+        if not media_id:
+            print(f"Failed to upload media: {upload_response.text}")
+            return
+
+        # 2. Send the document
+        send_url = f"https://graph.facebook.com/v17.0/{PHONE_NUMBER_ID}/messages"
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to_number,
+            "type": "document",
+            "document": {
+                "id": media_id,
+                "filename": os.path.basename(file_path),
+                "caption": caption
+            }
+        }
+        headers["Content-Type"] = "application/json"
+        requests.post(send_url, headers=headers, json=payload)
+    except Exception as e:
+        print(f"Error sending WhatsApp document: {e}")
 
 def download_whatsapp_media(media_id: str) -> str:
     """Downloads media from WhatsApp and returns the local file path."""

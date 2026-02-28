@@ -9,3 +9,6 @@ python-dotenv
 requests
 pydantic
 sarvamai
+reportlab
+matplotlib
+pandas

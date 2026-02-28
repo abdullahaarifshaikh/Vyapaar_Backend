@@ -83,3 +83,28 @@ def update_stock(product_id: str, quantity_to_add: int):
         return {"status": "error", "message": "Product not found."}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+@tool
+def delete_product(product_id: str = None, name: str = None):
+    """
+    Deletes a product from the inventory database.
+    Either product_id or name must be provided.
+    """
+    if not product_id and not name:
+        return {"status": "error", "message": "Please provide either product_id or name to delete."}
+
+    try:
+        query = {}
+        if product_id:
+            query["_id"] = ObjectId(product_id)
+        else:
+            query["name"] = {"$regex": f"^{name}$", "$options": "i"}
+
+        result = products_collection.delete_one(query)
+
+        if result.deleted_count > 0:
+            return {"status": "success", "message": f"Product '{name or product_id}' deleted successfully."}
+        return {"status": "error", "message": "Product not found."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
